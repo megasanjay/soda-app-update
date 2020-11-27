@@ -1,0 +1,14 @@
+*.[oa]
+*~
+
+# Ignore node_modules folder
+node_modules
+build
+pysodadist
+dist
+
+*.pyc
+src/package-lock.json
+src/.DS_Store
+api.spec
+.DS_Store
