@@ -1,11 +1,12 @@
-const {app, BrowserWindow, dialog} = require('electron')
+const { app, BrowserWindow, dialog } = require('electron')
 app.showExitPrompt = true
 const path = require('path')
 const glob = require('glob')
 const contextMenu = require('electron-context-menu');
-const log  = require("electron-log");
+const log = require("electron-log");
 require('v8-compile-cache')
-const {ipcMain} = require('electron')
+const { ipcMain } = require('electron')
+const { autoUpdater } = require("electron-updater");
 
 log.transports.console.level = false
 /*************************************************************
@@ -73,13 +74,14 @@ app.on('will-quit', exitPyProc)
  *************************************************************/
 
 let mainWindow = null
+let user_restart_confirmed = false;
 
-function initialize () {
+function initialize() {
   makeSingleInstance()
 
   loadDemos()
 
-  function createWindow () {
+  function createWindow() {
     const windowOptions = {
       minWidth: 1080,
       minHeight: 680,
@@ -99,34 +101,45 @@ function initialize () {
 
     mainWindow = new BrowserWindow(windowOptions)
     mainWindow.loadURL(path.join('file://', __dirname, '/index.html'))
-    mainWindow.webContents.openDevTools();
 
-/*    mainWindow.on('closed', () => {
-      mainWindow = null
-    })*/
+    mainWindow.webContents.openDevTools();
+    mainWindow.webContents.once('dom-ready', () => {
+      autoUpdater.checkForUpdatesAndNotify();
+    });
+
+    /*    mainWindow.on('closed', () => {
+          mainWindow = null
+        })*/
 
     mainWindow.on('close', (e) => {
-    if (app.showExitPrompt) {
+      if (app.showExitPrompt) {
         e.preventDefault() // Prevents the window from closing
+        if (user_restart_confirmed) {
+          quit_app();
+        }
         dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
-            type: 'question',
-            buttons: ['Yes', 'No'],
-            title: 'Confirm',
-            message: 'Any running proccess will be stopped. Are you sure you want to quit?'
+          type: 'question',
+          buttons: ['Yes', 'No'],
+          title: 'Confirm',
+          message: 'Any running proccess will be stopped. Are you sure you want to quit?'
         }, function (response) {
-            if (response === 0) { // Runs the following if 'Yes' is clicked
-                app.showExitPrompt = false
-                mainWindow.close()
-                /// feedback form iframe prevents closing gracefully
-                /// so force close
-                if (!mainWindow.closed) {
-                  mainWindow.destroy()
-                }
-            }
+          if (response === 0) { // Runs the following if 'Yes' is clicked
+          quit_app();
+          }
         })
-    }
+      }
     })
 
+  }
+
+  const quit_app = () => {
+    app.showExitPrompt = false
+    mainWindow.close()
+    /// feedback form iframe prevents closing gracefully
+    /// so force close
+    if (!mainWindow.closed) {
+      mainWindow.destroy()
+    }
   }
 
   app.on('ready', () => {
@@ -135,7 +148,7 @@ function initialize () {
 
   app.on('window-all-closed', () => {
     // if (process.platform !== 'darwin') {
-      app.quit()
+    app.quit()
     // }
   })
 
@@ -149,7 +162,7 @@ function initialize () {
 // Make this app a single instance app.
 const gotTheLock = app.requestSingleInstanceLock()
 
-function makeSingleInstance () {
+function makeSingleInstance() {
   if (process.mas) return
 
   if (!gotTheLock) {
@@ -174,7 +187,7 @@ showSaveImageAs prompts the users where they want to save the image.
 contextMenu()
 
 // Require each JS file in the main-process dir
-function loadDemos () {
+function loadDemos() {
   const files = glob.sync(path.join(__dirname, 'main-process/**/*.js'))
   files.forEach((file) => { require(file) })
 }
@@ -185,12 +198,29 @@ initialize()
 ipcMain.on('resize-window', (event, dir) => {
   var x = mainWindow.getSize()[0]
   var y = mainWindow.getSize()[1]
-  if (dir === 'up'){
-    x = x+1
-    y = y+1
+  if (dir === 'up') {
+    x = x + 1
+    y = y + 1
   } else {
-    x = x-1
-    y = y-1
+    x = x - 1
+    y = y - 1
   }
   mainWindow.setSize(x, y)
 })
+
+ipcMain.on("app_version", (event) => {
+  event.sender.send("app_version", { version: app.getVersion() });
+});
+
+autoUpdater.on("update-available", () => {
+  mainWindow.webContents.send("update_available");
+});
+
+autoUpdater.on("update-downloaded", () => {
+  mainWindow.webContents.send("update_downloaded");
+});
+
+ipcMain.on("restart_app", () => {
+  user_restart_confirmed = true;
+  autoUpdater.quitAndInstall();
+});

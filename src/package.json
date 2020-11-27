@@ -1,30 +1,21 @@
 {
   "name": "SODA",
   "productName": "SODA",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Keep Calm and Curate",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder build --win",
-    "postinstall": "electron-builder install-app-deps"
+    "build": "electron-builder build --win --publish never",
+    "deploy": "electron-builder build --win --publish always"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/megasanjay/soda-app-update.git"
   },
   "keywords": [],
   "author": "SODA Team",
   "license": "MIT",
-  "build": {
-    "appId": "com.electron.soda",
-    "asar": false,
-    "files": [
-      "**/*"
-    ],
-    "mac": {
-      "category": "your.app.category.type"
-    },
-    "nsis": {
-      "createDesktopShortcut": "always"
-    }
-  },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^5.14.0",
     "@toast-ui/editor": "^2.2.0",
@@ -38,6 +29,7 @@
     "electron-log": "^4.2.2",
     "electron-settings": "^3.2.0",
     "electron-shortcut-normalizer": "^1.0.0",
+    "electron-updater": "^4.3.5",
     "fomantic-ui": "^2.8.7",
     "glob": "^7.1.6",
     "html2canvas": "^1.0.0-rc.5",
