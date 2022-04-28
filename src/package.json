@@ -21,7 +21,7 @@
     "@toast-ui/editor": "^2.2.0",
     "@yaireo/tagify": "^3.13.0",
     "airtable": "^0.8.1",
-    "axios": "^0.19.2",
+    "axios": "^0.27.0",
     "bootbox": "^5.4.0",
     "bootstrap-icons": "^1.1.0",
     "cropperjs": "^1.5.7",
