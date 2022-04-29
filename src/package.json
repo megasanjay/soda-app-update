@@ -35,7 +35,7 @@
     "html2canvas": "^1.0.0-rc.5",
     "image-data-uri": "^2.0.1",
     "jquery": "^3.5.1",
-    "pdfkit": "^0.11.0",
+    "pdfkit": "^0.13.0",
     "remove-markdown": "^0.3.0",
     "spur-template": "^1.1.0",
     "v8-compile-cache": "^2.1.1",
