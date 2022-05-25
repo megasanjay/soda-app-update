@@ -98,7 +98,7 @@ def open_file(file_path):
     """
     try:
         if platform.system() == "Windows":
-            subprocess.Popen(r'explorer /select,' + str(file_path))
+            subprocess.Popen(f'explorer /select,{str(file_path)}')
         elif platform.system() == "Darwin":
             subprocess.Popen(["open", file_path])
         else:
@@ -134,7 +134,7 @@ def bf_dataset_size():
 
     try:
         selected_dataset_id = myds.id
-        bf_response = bf._api._get('/datasets/' + str(selected_dataset_id))
+        bf_response = bf._api._get(f'/datasets/{str(selected_dataset_id)}')
         return bf_response['storage'] if 'storage' in bf_response.keys() else 0
     except Exception as e:
         raise e
@@ -147,10 +147,7 @@ def path_size(path):
     Returns:
         total_size: total size of the file/folder in bytes (integer)
     """
-    if isdir(path):
-        return folder_size(path)
-    else:
-        return getsize(path)
+    return folder_size(path) if isdir(path) else getsize(path)
 
 
 def create_folder_level_manifest(jsonpath, jsondescription):
@@ -185,13 +182,13 @@ def create_folder_level_manifest(jsonpath, jsondescription):
                 # Remove manifest file from the list if already exists
                 folderpath = join(datasetpath, folder)
                 allfiles = jsonpath[folder]
-                alldescription = jsondescription[folder + '_description']
+                alldescription = jsondescription[f'{folder}_description']
                 manifestexists = join(folderpath, 'manifest.xlsx')
 
                 countpath = -1
                 for pathname in allfiles:
                     countpath += 1
-                    if basename(pathname) == 'manifest.csv' or basename(pathname) == 'manifest.xlsx':
+                    if basename(pathname) in ['manifest.csv', 'manifest.xlsx']:
                         allfiles.pop(countpath)
                         alldescription.pop(countpath)
 
@@ -238,9 +235,7 @@ def create_folder_level_manifest(jsonpath, jsondescription):
                         if isdir(paths):
                             filetype.append('folder')
                         else:
-                            fileextension = splitext(file)[1]
-                            if not fileextension:  #if empty (happens e.g. with Readme files)
-                                fileextension = 'None'
+                            fileextension = splitext(file)[1] or 'None'
                             filetype.append(fileextension)
 
                 df['filename'] = filename
@@ -272,14 +267,13 @@ def return_new_path(topath):
     Returns:
         topath: new folder name based on the availability in destination folder (string)
     """
-    if exists(topath):
-        i = 2
-        while True:
-            if not exists(topath + ' (' + str(i) + ')'):
-                return topath + ' (' + str(i) + ')'
-            i += 1
-    else:
+    if not exists(topath):
         return topath
+    i = 2
+    while True:
+        if not exists(f'{topath} ({str(i)})'):
+            return f'{topath} ({str(i)})'
+        i += 1
 
 def time_format(elapsed_time):
     mins, secs = divmod(elapsed_time, 60)
@@ -346,8 +340,7 @@ def save_file_organization(jsonpath, jsondescription, jsonpathmetadata, pathsave
         mydict3 = jsonpathmetadata
         mydict.update(mydict2)
         mydict.update(mydict3)
-        dictkeys = list(mydict.keys())
-        dictkeys.sort()
+        dictkeys = sorted(mydict.keys())
         df = pd.DataFrame(columns=[dictkeys[0]])
         df[dictkeys[0]] = mydict[dictkeys[0]]
         for i in range(1,len(dictkeys)):
@@ -419,10 +412,7 @@ def create_preview_files(paths, folder_path):
                 open(join(folder_path, file), 'a').close()
             else:
                 all_files = listdir(p)
-                all_files_path = []
-                for f in all_files:
-                    all_files_path.append(join(p, f))
-
+                all_files_path = [join(p, f) for f in all_files]
                 pname = basename(p)
                 new_folder_path = join(folder_path, pname)
                 makedirs(new_folder_path)
@@ -536,10 +526,7 @@ def create_dataset(jsonpath, pathdataset):
         # create all subfolders and generate a list of all files to copy
         listallfiles = []
         for i in folderrequired:
-            if i == 'main':
-                outputpath = pathdataset
-            else:
-                outputpath = join(pathdataset, i)
+            outputpath = pathdataset if i == 'main' else join(pathdataset, i)
             for tablepath in mydict[i]:
                 if isdir(tablepath):
                     foldername = basename(tablepath)
@@ -564,7 +551,7 @@ def create_dataset(jsonpath, pathdataset):
         for fileinfo in listallfiles:
             srcfile = fileinfo[0]
             distfile = fileinfo[1]
-            curateprogress = 'Copying ' + str(srcfile)
+            curateprogress = f'Copying {str(srcfile)}'
             mycopyfile_with_metadata(srcfile, distfile)
 
     except Exception as e:
@@ -584,9 +571,7 @@ def bf_get_current_user_permission(bf, myds):
 
     try:
         selected_dataset_id = myds.id
-        user_role = bf._api._get('/datasets/' + str(selected_dataset_id) + '/role')['role']
-
-        return user_role
+        return bf._api._get(f'/datasets/{str(selected_dataset_id)}/role')['role']
 
     except Exception as e:
         raise e
@@ -777,10 +762,7 @@ def curate_dataset(sourcedataset, destinationdataset, pathdataset, newdatasetnam
 
                     for folder in jsonpath.keys():
                         if jsonpath[folder] != []:
-                            if folder != 'main':
-                                mybffolder = myds.create_collection(folder)
-                            else:
-                                mybffolder = myds
+                            mybffolder = myds.create_collection(folder) if folder != 'main' else myds
                             for mypath in jsonpath[folder]:
                                 if isdir(mypath):
                                     curateprogress = "Uploading folder '%s' to dataset '%s' " %(mypath, bfdataset)
@@ -856,16 +838,15 @@ def validate_dataset(validator_input):
         else:
             raise Exception('Error: validator input must be string (path to dataset) or a SODA JSON Structure/Python dictionary')
 
-        res = []
-
         validatorHighLevelFolder = validate_high_level_folder_structure(jsonStruct)
         validatorObj = validatorHighLevelFolder
-        resitem = {}
-        resitem['pass'] = validatorObj.passes
-        resitem['warnings'] = validatorObj.warnings
-        resitem['fatal'] = validatorObj.fatal
-        res.append(resitem)
+        resitem = {
+            'pass': validatorObj.passes,
+            'warnings': validatorObj.warnings,
+            'fatal': validatorObj.fatal,
+        }
 
+        res = [resitem]
         validatorHighLevelMetadataFiles, isSubmission, isDatasetDescription, isSubjects, isSamples = \
          validate_high_level_metadata_files(jsonStruct)
         validatorObj = validatorHighLevelMetadataFiles
@@ -897,13 +878,21 @@ def validate_dataset(validator_input):
             resitem['fatal'] = validatorObj.fatal
             res.append(resitem)
         elif isSubmission == 0:
-            resitem = {}
-            resitem['warnings'] = ["Include a 'submission' file in a valid format to check it through the validator"]
+            resitem = {
+                'warnings': [
+                    "Include a 'submission' file in a valid format to check it through the validator"
+                ]
+            }
+
             res.append(resitem)
 
         elif isSubmission>1:
-            resitem = {}
-            resitem['warnings'] = ["Include a unique 'submission' file to check it through the validator"]
+            resitem = {
+                'warnings': [
+                    "Include a unique 'submission' file to check it through the validator"
+                ]
+            }
+
             res.append(resitem)
 
         if isDatasetDescription == 1:
@@ -921,12 +910,20 @@ def validate_dataset(validator_input):
             res.append(resitem)
 
         elif isDatasetDescription == 0:
-            resitem = {}
-            resitem['warnings'] = ["Include a 'dataset_description' file in a valid format to check it through the validator"]
+            resitem = {
+                'warnings': [
+                    "Include a 'dataset_description' file in a valid format to check it through the validator"
+                ]
+            }
+
             res.append(resitem)
         elif isDatasetDescription>1:
-            resitem = {}
-            resitem['warnings'] = ["Include a unique 'dataset_description' file to check it through the validator"]
+            resitem = {
+                'warnings': [
+                    "Include a unique 'dataset_description' file to check it through the validator"
+                ]
+            }
+
             res.append(resitem)
 
         return res
@@ -955,36 +952,35 @@ def check_empty_files_folders(soda_json_structure):
     
     def recursive_empty_files_check(my_folder, my_relative_path, error_files):
         for folder_key, folder in my_folder["folders"].items():
-            relative_path = my_relative_path + "/" + folder_key
+            relative_path = f"{my_relative_path}/{folder_key}"
             error_files = recursive_empty_files_check(folder, relative_path, error_files)
-                    
+
         for file_key in list(my_folder["files"].keys()):
             file = my_folder["files"][file_key]
-            file_type = file["type"] 
+            file_type = file["type"]
             if file_type == "local":
                 file_path = file["path"]
                 if isfile(file_path):
                     file_size = getsize(file_path)
                     if file_size == 0:
-                        del my_folder["files"][file_key] 
-                        relative_path = my_relative_path + "/" +  file_key
-                        error_message = relative_path + " (path: " + file_path + ")"
+                        del my_folder["files"][file_key]
+                        relative_path = f"{my_relative_path}/{file_key}"
+                        error_message = f"{relative_path} (path: {file_path})"
                         error_files.append(error_message)
-                        
+
         return error_files
     
     def recursive_empty_local_folders_check(my_folder, my_folder_key, my_folders_content, my_relative_path, error_folders):
         folders_content = my_folder["folders"]
         for folder_key in list(my_folder["folders"].keys()):
             folder = my_folder["folders"][folder_key]
-            relative_path = my_relative_path + "/" + folder_key
+            relative_path = f"{my_relative_path}/{folder_key}"
             error_folders = recursive_empty_local_folders_check(folder, folder_key, folders_content, relative_path, error_folders)
-                
-        if not my_folder["folders"]:
-            if not my_folder["files"]:
-                error_message = my_relative_path
-                error_folders.append(error_message)
-                del my_folders_content[my_folder_key]
+
+        if not my_folder["folders"] and not my_folder["files"]:
+            error_message = my_relative_path
+            error_folders.append(error_message)
+            del my_folders_content[my_folder_key]
         return error_folders
               
     error_files = []
@@ -1038,7 +1034,7 @@ def check_local_dataset_files_validity(soda_json_structure):
 
     def recursive_local_file_check(my_folder, my_relative_path, error):
         for folder_key, folder in my_folder["folders"].items():
-            relative_path = my_relative_path + "/" + folder_key
+            relative_path = f"{my_relative_path}/{folder_key}"
             error = recursive_local_file_check(folder, relative_path, error)
 
         for file_key in list(my_folder["files"].keys()):
@@ -1047,14 +1043,14 @@ def check_local_dataset_files_validity(soda_json_structure):
             if file_type == "local":
                 file_path = file["path"]
                 if not isfile(file_path):
-                    relative_path = my_relative_path + "/" +  file_key
-                    error_message = relative_path + " (path: " + file_path + ")"
+                    relative_path = f"{my_relative_path}/{file_key}"
+                    error_message = f"{relative_path} (path: {file_path})"
                     error.append(error_message)
                 else:
                     file_size = getsize(file_path)
                     if file_size == 0:
                         del my_folder["files"][file_key] 
-                        
+
         return error
     
     def recursive_empty_local_folder_remove(my_folder, my_folder_key, my_folders_content):
@@ -1063,10 +1059,9 @@ def check_local_dataset_files_validity(soda_json_structure):
         for folder_key in list(my_folder["folders"].keys()):
             folder = my_folder["folders"][folder_key]
             recursive_empty_local_folder_remove(folder, folder_key, folders_content)
-                
-        if not my_folder["folders"]:
-            if not my_folder["files"]:
-                del my_folders_content[my_folder_key]
+
+        if not my_folder["folders"] and not my_folder["files"]:
+            del my_folders_content[my_folder_key]
                        
     error = []
     if "dataset-structure" in soda_json_structure.keys():
@@ -1149,13 +1144,10 @@ def create_high_level_manifest_files(soda_json_structure):
             if "description" in file.keys(): 
                 dict_folder_manifest["description"].append(file["description"])
             else: 
-                dict_folder_manifest["description"].append("")                                    
+                dict_folder_manifest["description"].append("")
             #file type
             name_split = splitext(file_key)
-            if name_split[1] == "":
-                fileextension = "None"
-            else:      
-                fileextension = name_split[1]
+            fileextension = "None" if name_split[1] == "" else name_split[1]
             dict_folder_manifest["file type"].append(fileextension)
             #addtional metadata  
             if "additional-metadata" in file.keys(): 
@@ -1258,11 +1250,10 @@ def get_generate_dataset_size(soda_json_structure, manifest_files_structure):
         if "files" in my_folder.keys():
             for file_key, file in my_folder["files"].items():
                 file_type = file["type"]
-                if file_type == "local":
-                    if "new" in file["action"]:
-                        file_path = file["path"]
-                        if isfile(file_path):
-                            total_size += getsize(file_path)
+                if file_type == "local" and "new" in file["action"]:
+                    file_path = file["path"]
+                    if isfile(file_path):
+                        total_size += getsize(file_path)
         return total_size
     
     try:
@@ -1301,10 +1292,10 @@ def generate_dataset_locally(soda_json_structure):
                     if not isdir(folderpath):
                         mkdir(folderpath)
                     list_copy_files, list_move_files = recursive_dataset_scan(folder, folderpath, list_copy_files, list_move_files)
-                        
+
             if "files" in my_folder.keys():
                 for file_key, file in my_folder["files"].items():
-                    if not "deleted" in file["action"]:
+                    if "deleted" not in file["action"]:
                         file_type = file["type"]
                         if file_type == "local":
                             file_path = file["path"]
@@ -1392,15 +1383,16 @@ def bf_create_new_dataset(datasetname, bf):
         datasetname = datasetname.strip()
 
         if check_forbidden_characters_bf(datasetname):
-            error = error + 'Error: A Blackfynn dataset name cannot contain any of the following characters: ' + forbidden_characters_bf + "<br>"
+            error = f'{error}Error: A Blackfynn dataset name cannot contain any of the following characters: {forbidden_characters_bf}<br>'
+
             c += 1
 
         if (not datasetname):
-            error = error + 'Error: Please enter valid dataset name' + "<br>"
+            error = f'{error}Error: Please enter valid dataset name<br>'
             c += 1
 
         if (datasetname.isspace()):
-            error = error + 'Error: Please enter valid dataset name' + "<br>"
+            error = f'{error}Error: Please enter valid dataset name<br>'
             c += 1
 
         if c>0:
@@ -1413,9 +1405,9 @@ def bf_create_new_dataset(datasetname, bf):
             raise Exception('Error: Dataset name already exists')
         else:
             ds = bf.create_dataset(datasetname)
-        
+
         return ds
-    
+
     except Exception as e:
         raise e
 
@@ -1432,51 +1424,64 @@ def bf_generate_new_dataset(soda_json_structure, bf, ds):
                 my_tracking_folder["folders"] = {}
                 for folder_key, folder in my_folder["folders"].items():
                     
-                    if existing_folder_option == "skip":
-                        if folder_key in my_bf_existing_folders_name:
-                            continue
-                            
-                    elif existing_folder_option == "create-duplicate":
+                    if (
+                        existing_folder_option == "skip"
+                        and folder_key in my_bf_existing_folders_name
+                    ):
+                        continue
+
+                    elif (
+                        existing_folder_option == "skip"
+                        or existing_folder_option
+                        not in ["create-duplicate", "replace", "merge"]
+                    ):
+                        pass
+                    elif (
+                        existing_folder_option != "create-duplicate"
+                        and existing_folder_option != "replace"
+                        and folder_key in my_bf_existing_folders_name
+                    ):
+                        index_folder = my_bf_existing_folders_name.index(folder_key)
+                        bf_folder = my_bf_existing_folders[index_folder]
+                    elif (
+                        existing_folder_option not in ["create-duplicate", "replace"]
+                        or existing_folder_option == "create-duplicate"
+                    ):
                         bf_folder = my_bf_folder.create_collection(folder_key)
-                        
-                    elif existing_folder_option == "replace":
+
+                    else:
                         if folder_key in my_bf_existing_folders_name:
                             index_folder = my_bf_existing_folders_name.index(folder_key)
                             bf_folder = my_bf_existing_folders[index_folder]
                             bf_folder.delete() 
                         bf_folder = my_bf_folder.create_collection(folder_key)
-                        
-                    elif existing_folder_option == "merge":
-                        if folder_key in my_bf_existing_folders_name:
-                            index_folder = my_bf_existing_folders_name.index(folder_key)
-                            bf_folder = my_bf_existing_folders[index_folder]
-                        else:
-                            bf_folder = my_bf_folder.create_collection(folder_key)
-                            
+
                     my_tracking_folder["folders"][folder_key] = {"value": bf_folder}
                     tracking_folder = my_tracking_folder["folders"][folder_key]
                     recursive_create_folder_for_bf(folder, tracking_folder, existing_folder_option)                      
 
         def recursive_dataset_scan_for_bf(my_folder, my_tracking_folder, existing_file_option, list_upload_files):
             my_bf_folder = my_tracking_folder["value"]
-            
+
             if "folders" in my_folder.keys():
                 my_bf_existing_folders = [x for x in my_bf_folder.items if x.type == "Collection"]
                 my_bf_existing_folders_name = [splitext(x.name)[0] for x in my_bf_existing_folders]
-            
+
                 for folder_key, folder in my_folder["folders"].items():
                     
-                    if existing_folder_option == "skip":
-                        if folder_key in my_bf_existing_folders_name:
-                            continue
-                    
+                    if (
+                        existing_folder_option == "skip"
+                        and folder_key in my_bf_existing_folders_name
+                    ):
+                        continue
+
                     tracking_folder = my_tracking_folder["folders"][folder_key]
                     list_upload_files = recursive_dataset_scan_for_bf(folder, tracking_folder, existing_file_option, list_upload_files)
-                        
+
             if "files" in my_folder.keys():
                 my_bf_existing_files = [x for x in my_bf_folder.items if x.type != "Collection"]
                 my_bf_existing_files_name = [splitext(x.name)[0] for x in my_bf_existing_files]
-            
+
                 list_local_files = []
                 list_projected_name = []
                 list_desired_name = []
@@ -1490,17 +1495,21 @@ def bf_generate_new_dataset(soda_json_structure, bf, ds):
                             
                             initial_name = splitext(basename(file_path))[0]
                             desired_name = splitext(file_key)[0]
-                            
-                            if existing_file_option == "replace":
-                                if initial_name in my_bf_existing_files_name:
-                                    index_file = my_bf_existing_files_name.index(initial_name)
-                                    my_file = my_bf_existing_files[index_file]
-                                    my_file.delete() 
-                            
-                            if existing_file_option == "skip":
-                                if initial_name in my_bf_existing_files_name:
-                                    continue
-                                    
+
+                            if (
+                                existing_file_option == "replace"
+                                and initial_name in my_bf_existing_files_name
+                            ):
+                                index_file = my_bf_existing_files_name.index(initial_name)
+                                my_file = my_bf_existing_files[index_file]
+                                my_file.delete() 
+
+                            if (
+                                existing_file_option == "skip"
+                                and initial_name in my_bf_existing_files_name
+                            ):
+                                continue
+
                             # find projected filename on Blackfynn
 
                             # check if initial filename exists on Blackfynn dataset
@@ -1510,7 +1519,7 @@ def bf_generate_new_dataset(soda_json_structure, bf, ds):
                             while count_done == 0:
                                 if projected_name in my_bf_existing_files_name:
                                     count_exist += 1
-                                    projected_name = initial_name + " (" + str(count_exist) + ")"
+                                    projected_name = f"{initial_name} ({count_exist})"
                                 else:
                                     count_done = 1
 
@@ -1519,18 +1528,18 @@ def bf_generate_new_dataset(soda_json_structure, bf, ds):
                             if projected_name in list_upload_schedule_projected_names:
                                 count_exist += 1
                                 count_exist_projected = 1
-                                projected_name = initial_name + " (" + str(count_exist) + ")" 
+                                projected_name = f"{initial_name} ({count_exist})" 
 
                             # save in list accordingly
                             if count_exist_projected == 1:
                                 additional_upload_lists.append([[file_path], my_bf_folder, [projected_name], [desired_name], my_tracking_folder])
-                                
+
                             else:
                                 list_local_files.append(file_path)
                                 list_desired_name.append(desired_name)
                                 list_projected_name.append(projected_name)
                             list_upload_schedule_projected_names.append(projected_name)
-                
+
                 if list_local_files:
                     list_upload_files.append([list_local_files, my_bf_folder, list_projected_name, list_desired_name, my_tracking_folder])
                     print(list_local_files)
@@ -1538,7 +1547,7 @@ def bf_generate_new_dataset(soda_json_structure, bf, ds):
                 for item in additional_upload_lists:
                     list_upload_files.append(item)  
                     print("item", item)
-                
+
             return list_upload_files
         
                                
@@ -1635,7 +1644,8 @@ def main_curate_function(soda_json_structure):
         # if generate_dataset["if-existing"] == "merge":
         #     local_dataset_path = join(local_dataset_path, generate_dataset["dataset-name"])
         if not isdir(local_dataset_path):
-            error_message = 'Error: The Path ' + local_dataset_path + ' is not found. Please select a valid destination folder for the new dataset'
+            error_message = f'Error: The Path {local_dataset_path} is not found. Please select a valid destination folder for the new dataset'
+
             curatestatus = 'Done'
             error.append(error_message)
             raise Exception(error)
@@ -1651,7 +1661,7 @@ def main_curate_function(soda_json_structure):
             curatestatus = 'Done'
             error.append('Error: Please select a valid Blackfynn account')
             raise Exception(error)
-        
+
         # if uploading on an existing bf dataset
         dataset_name = soda_json_structure["generate-dataset"]["dataset-name"]
         if not dataset_name:
@@ -1702,13 +1712,14 @@ def main_curate_function(soda_json_structure):
         except Exception as e:
             curatestatus = 'Done'
             raise e
-        
+
         # Check that bf files/folders exist
         if generate_option == "existing-bf":
             try:
                 if soda_json_structure["generate-dataset"]["destination"] == "bf":
-                    error = bf_check_dataset_files_validity(soda_json_structure,bf)
-                    if error: 
+                    if error := bf_check_dataset_files_validity(
+                        soda_json_structure, bf
+                    ):
                         curatestatus = 'Done'
                         raise Exception(error)
             except Exception as e:
@@ -1732,21 +1743,23 @@ def main_curate_function(soda_json_structure):
         except Exception as e:
             curatestatus = 'Done'
             raise e
-            
+
     # 4] Evaluate total size of data to be generated
     if "generate-dataset" in main_keys:
         generate_dataset_size = get_generate_dataset_size(soda_json_structure, manifest_files_structure)
         print("SIZE", generate_dataset_size)
-        
+
     # 5] Generate
     if "generate-dataset" in main_keys:
         if soda_json_structure["generate-dataset"]["destination"] == "local":
             datasetpath = generate_dataset_locally(soda_json_structure)
             add_local_manifest_files(manifest_files_structure, datasetpath)
-            
-        if soda_json_structure["generate-dataset"]["destination"] == "bf":
-            if generate_option == "new":
-                if dataset_name:
-                    myds = bf_create_new_dataset(dataset_name, bf)
-                bf_generate_new_dataset(soda_json_structure, bf, myds)
-                bf_add_manifest_files(manifest_files_structure, myds)
+
+        if (
+            soda_json_structure["generate-dataset"]["destination"] == "bf"
+            and generate_option == "new"
+        ):
+            if dataset_name:
+                myds = bf_create_new_dataset(dataset_name, bf)
+            bf_generate_new_dataset(soda_json_structure, bf, myds)
+            bf_add_manifest_files(manifest_files_structure, myds)
