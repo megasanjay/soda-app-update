@@ -154,7 +154,7 @@ def rename_headers(workbook, keyword_array, contributor_role_array, funding_arra
 
         for i, column in zip(range(2, max_len+1), columns_list[1:]):
 
-            workbook[column + "1"] = "Value " + str(i)
+            workbook[column + "1"] = f"Value {str(i)}"
             cell = workbook[column + "1"]
 
             blueFill = PatternFill(start_color='9CC2E5',
