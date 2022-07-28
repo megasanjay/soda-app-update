@@ -29,7 +29,7 @@
     "electron-log": "^4.2.2",
     "electron-settings": "^3.2.0",
     "electron-shortcut-normalizer": "^1.0.0",
-    "electron-updater": "^4.3.5",
+    "electron-updater": "^5.0.5",
     "fomantic-ui": "^2.8.7",
     "glob": "^7.1.6",
     "html2canvas": "^1.0.0-rc.5",
